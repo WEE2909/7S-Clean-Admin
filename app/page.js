@@ -64,6 +64,7 @@ export default function App() {
   const [login, setLogin] = useState({ u: "", p: "", err: "" });
   const [assigning, setAssigning] = useState(null);
   const [nameInput, setNameInput] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [draft, setDraft] = useState({ checks: {}, inspector: "" });
 
   useEffect(() => {
@@ -108,22 +109,31 @@ export default function App() {
                 onChange={(e) => setLogin({ ...login, u: e.target.value, err: "" })}
                 autoCapitalize="none"
                 placeholder="กรอกชื่อผู้ใช้"
-                className="mt-2 h-[52px] w-full rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] px-4 text-base"
+                className="mt-2 h-[52px] w-full rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] px-4 text-base focus:border-[#1B6A93] focus:bg-white focus:outline-none"
               />
             </label>
             <label className="block">
               <span className="text-sm font-medium text-[#3B5268]">รหัสผ่าน</span>
-              <input
-                type="password"
-                value={login.p}
-                onChange={(e) => setLogin({ ...login, p: e.target.value, err: "" })}
-                onKeyDown={(e) => e.key === "Enter" && doLogin()}
-                placeholder="กรอกรหัสผ่าน"
-                className="mt-2 h-[52px] w-full rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] px-4 text-base"
-              />
+              <div className="relative mt-2">
+                <input
+                  type={showPass ? "text" : "password"}
+                  value={login.p}
+                  onChange={(e) => setLogin({ ...login, p: e.target.value, err: "" })}
+                  onKeyDown={(e) => e.key === "Enter" && doLogin()}
+                  placeholder="กรอกรหัสผ่าน"
+                  className="h-[52px] w-full rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] pl-4 pr-16 text-base focus:border-[#1B6A93] focus:bg-white focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-lg px-3 text-sm font-medium text-[#1B6A93]"
+                >
+                  {showPass ? "ซ่อน" : "แสดง"}
+                </button>
+              </div>
             </label>
             {login.err && <p className="text-sm font-medium text-red-700">{login.err}</p>}
-            <button onClick={doLogin} className={`h-[54px] w-full rounded-2xl ${BLUE} text-[17px] font-bold text-white`}>
+            <button onClick={doLogin} className={`h-[54px] w-full rounded-2xl ${BLUE} text-[17px] font-bold text-white transition-transform active:scale-[0.98]`}>
               เข้าสู่ระบบ
             </button>
             <p className="text-center text-sm text-[#3B5268]">ลืมรหัสผ่าน ติดต่อผู้ดูแลระบบ</p>
