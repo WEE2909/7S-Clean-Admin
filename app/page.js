@@ -99,7 +99,7 @@ export default function App() {
         <Header sub="CLEAN CHECK" title="เข้าสู่ระบบ">
           <p className="mt-2 text-[#E4EFFA]">ประเมินความสะอาดตามหลัก 7ส</p>
         </Header>
-        <div className="-mt-10 px-5">
+        <div className="relative -mt-10 px-5">
           <div className="space-y-5 rounded-3xl bg-white p-6 shadow-lg">
             <label className="block">
               <span className="text-sm font-medium text-[#3B5268]">ชื่อผู้ใช้</span>
@@ -154,7 +154,7 @@ export default function App() {
     return (
       <main className="mx-auto min-h-screen max-w-md bg-[#EEF3F8] pb-28 text-[#12263A]">
         <Header sub="CLEAN CHECK" title={AREAS[i]} />
-        <div className="-mt-10 space-y-4 px-5">
+        <div className="relative -mt-10 space-y-4 px-5">
           <div className="space-y-2 rounded-3xl bg-white p-4 text-sm shadow-lg">
             <div className="flex justify-between">
               <span className="text-[#3B5268]">วันที่ตรวจ:</span>
@@ -247,7 +247,7 @@ export default function App() {
           ออกจากระบบ
         </button>
       </Header>
-      <div className="-mt-10 px-5">
+      <div className="relative -mt-10 px-5">
         <div className="space-y-1 rounded-3xl bg-white p-4 text-sm shadow-lg">
           <p>
             <span className="text-[#3B5268]">วันที่: </span>
