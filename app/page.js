@@ -41,11 +41,15 @@ const todayThai = () =>
 
 const BLUE = "bg-[#1B6A93]";
 
-function Header({ title, sub, children }) {
+function Header({ title, sub, children, logo }) {
   return (
     <header className={`relative overflow-hidden rounded-b-[36px] ${BLUE} px-5 pb-24 pt-8 text-white`}>
       <div className="absolute -right-14 -top-14 h-48 w-48 rounded-full bg-white/10" />
-      <div className="absolute right-8 top-10 h-20 w-20 rounded-full bg-white/15" />
+      {logo ? (
+        <img src="/logo.png" alt="โลโก้ 7ส" className="absolute right-6 top-6 h-24 w-24 rounded-full" />
+      ) : (
+        <div className="absolute right-8 top-10 h-20 w-20 rounded-full bg-white/15" />
+      )}
       <div className="relative">
         {sub && <p className="text-sm font-medium tracking-wide">{sub}</p>}
         <h1 className="mt-1 text-2xl font-bold leading-snug">{title}</h1>
@@ -61,7 +65,7 @@ export default function App() {
   const [assign, setAssign] = useState({}); // areaIndex -> ชื่อผู้รับผิดชอบ
   const [results, setResults] = useState({}); // date -> areaIndex -> {checks, inspector}
   const [view, setView] = useState({ name: "list" });
-  const [login, setLogin] = useState({ u: "user", p: "", err: "" });
+  const [login, setLogin] = useState({ u: "user", name: "", p: "", err: "" });
   const [assigning, setAssigning] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -89,31 +93,41 @@ export default function App() {
   const doLogin = () => {
     const found = USERS.find((x) => x.u === login.u.trim() && x.p === login.p);
     if (!found) return setLogin({ ...login, err: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
-    setUser({ u: found.u, role: found.role, name: found.name });
-    setLogin({ u: "user", p: "", err: "" });
+    setUser({ u: found.u, role: found.role, name: found.role === "admin" ? found.name : login.name.trim() || "User" });
+    setLogin({ u: "user", name: "", p: "", err: "" });
   };
 
   // ---------- หน้าเข้าสู่ระบบ ----------
   if (!user) {
     return (
       <main className="mx-auto min-h-screen max-w-md bg-[#EEF3F8] text-[#12263A]">
-        <Header sub="CLEAN CHECK" title="เข้าสู่ระบบ">
+        <Header sub="CLEAN CHECK" title="เข้าสู่ระบบ" logo>
           <p className="mt-2 text-[#E4EFFA]">ประเมินความสะอาดตามหลัก 7ส</p>
         </Header>
         <div className="relative -mt-10 px-5">
           <div className="space-y-5 rounded-3xl bg-white p-6 shadow-lg">
             <div>
               <span className="text-sm font-medium text-[#3B5268]">ชื่อผู้ใช้</span>
-              <button
-                type="button"
-                onClick={() => setLogin({ ...login, u: login.u === "admin" ? "user" : "admin", err: "" })}
-                className="mt-2 flex h-[52px] w-full items-center justify-between rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] px-4 text-base"
-              >
-                <span className="font-medium">{login.u === "admin" ? "Admin" : "User"}</span>
-                <span className="text-[13px] text-[#3B5268]">
+              <div className="mt-2 flex h-[52px] w-full items-center rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] pl-4 pr-2 text-base focus-within:border-[#1B6A93] focus-within:bg-white">
+                {login.u === "admin" ? (
+                  <span className="flex-1 font-medium">Admin</span>
+                ) : (
+                  <input
+                    value={login.name}
+                    onChange={(e) => setLogin({ ...login, name: e.target.value, err: "" })}
+                    placeholder="User"
+                    aria-label="ชื่อผู้ใช้"
+                    className="min-w-0 flex-1 bg-transparent font-medium outline-none placeholder:text-[#12263A]"
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setLogin({ ...login, u: login.u === "admin" ? "user" : "admin", err: "" })}
+                  className="shrink-0 rounded-lg px-2 py-2 text-[13px] text-[#3B5268]"
+                >
                   {login.u === "admin" ? "แตะเพื่อเปลี่ยนเป็น User" : "แตะเพื่อเปลี่ยนเป็น Admin"}
-                </span>
-              </button>
+                </button>
+              </div>
             </div>
             <label className="block">
               <span className="text-sm font-medium text-[#3B5268]">รหัสผ่าน</span>
@@ -141,7 +155,7 @@ export default function App() {
             </button>
             <p className="text-center text-sm text-[#3B5268]">ลืมรหัสผ่าน ติดต่อผู้ดูแลระบบ</p>
           </div>
-          <p className="mt-6 text-center text-xs text-[#3B5268]">รหัสผ่านทดลอง: 1234 (ใช้ได้ทั้ง User และ Admin)</p>
+          <p className="mt-6 text-center text-xs text-[#3B5268]">รหัสผ่านทดลอง: 1234 · พิมพ์ชื่อของคุณแทนคำว่า User ได้ เช่น Vee</p>
           <p className="mt-10 pb-6 text-center text-xs text-[#3B5268]">ระบบประเมินความสะอาด 7ส</p>
         </div>
       </main>
