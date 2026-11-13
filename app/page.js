@@ -6,7 +6,7 @@ const KEY = "cleancheck-v1";
 // บัญชีทดลอง (รอบแรก) จะเปลี่ยนเป็นระบบล็อกอินจริงในรอบสอง
 const USERS = [
   { u: "admin", p: "1234", role: "admin", name: "ผู้ดูแลระบบ" },
-  { u: "staff", p: "1234", role: "staff", name: "เจ้าหน้าที่" },
+  { u: "user", p: "1234", role: "staff", name: "ผู้ใช้" },
 ];
 
 const AREAS = [
@@ -61,7 +61,7 @@ export default function App() {
   const [assign, setAssign] = useState({}); // areaIndex -> ชื่อผู้รับผิดชอบ
   const [results, setResults] = useState({}); // date -> areaIndex -> {checks, inspector}
   const [view, setView] = useState({ name: "list" });
-  const [login, setLogin] = useState({ u: "", p: "", err: "" });
+  const [login, setLogin] = useState({ u: "user", p: "", err: "" });
   const [assigning, setAssigning] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -90,7 +90,7 @@ export default function App() {
     const found = USERS.find((x) => x.u === login.u.trim() && x.p === login.p);
     if (!found) return setLogin({ ...login, err: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
     setUser({ u: found.u, role: found.role, name: found.name });
-    setLogin({ u: "", p: "", err: "" });
+    setLogin({ u: "user", p: "", err: "" });
   };
 
   // ---------- หน้าเข้าสู่ระบบ ----------
@@ -102,16 +102,19 @@ export default function App() {
         </Header>
         <div className="relative -mt-10 px-5">
           <div className="space-y-5 rounded-3xl bg-white p-6 shadow-lg">
-            <label className="block">
+            <div>
               <span className="text-sm font-medium text-[#3B5268]">ชื่อผู้ใช้</span>
-              <input
-                value={login.u}
-                onChange={(e) => setLogin({ ...login, u: e.target.value, err: "" })}
-                autoCapitalize="none"
-                placeholder="กรอกชื่อผู้ใช้"
-                className="mt-2 h-[52px] w-full rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] px-4 text-base focus:border-[#1B6A93] focus:bg-white focus:outline-none"
-              />
-            </label>
+              <button
+                type="button"
+                onClick={() => setLogin({ ...login, u: login.u === "admin" ? "user" : "admin", err: "" })}
+                className="mt-2 flex h-[52px] w-full items-center justify-between rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] px-4 text-base"
+              >
+                <span className="font-medium">{login.u === "admin" ? "Admin" : "User"}</span>
+                <span className="text-[13px] text-[#3B5268]">
+                  {login.u === "admin" ? "แตะเพื่อเปลี่ยนเป็น User" : "แตะเพื่อเปลี่ยนเป็น Admin"}
+                </span>
+              </button>
+            </div>
             <label className="block">
               <span className="text-sm font-medium text-[#3B5268]">รหัสผ่าน</span>
               <div className="relative mt-2">
@@ -138,9 +141,8 @@ export default function App() {
             </button>
             <p className="text-center text-sm text-[#3B5268]">ลืมรหัสผ่าน ติดต่อผู้ดูแลระบบ</p>
           </div>
-          <p className="mt-6 text-center text-xs text-[#3B5268]">
-            บัญชีทดลอง: admin / 1234 (แอดมิน) และ staff / 1234 (ผู้ตรวจ)
-          </p>
+          <p className="mt-6 text-center text-xs text-[#3B5268]">รหัสผ่านทดลอง: 1234 (ใช้ได้ทั้ง User และ Admin)</p>
+          <p className="mt-10 pb-6 text-center text-xs text-[#3B5268]">ระบบประเมินความสะอาด 7ส</p>
         </div>
       </main>
     );
