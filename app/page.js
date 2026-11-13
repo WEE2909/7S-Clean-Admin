@@ -43,7 +43,7 @@ const BLUE = "bg-[#1B6A93]";
 
 function Header({ title, sub, children }) {
   return (
-    <header className={`relative overflow-hidden ${BLUE} px-5 pb-16 pt-8 text-white`}>
+    <header className={`relative overflow-hidden rounded-b-[36px] ${BLUE} px-5 pb-24 pt-8 text-white`}>
       <div className="absolute -right-14 -top-14 h-48 w-48 rounded-full bg-white/10" />
       <div className="absolute right-8 top-10 h-20 w-20 rounded-full bg-white/15" />
       <div className="relative">
