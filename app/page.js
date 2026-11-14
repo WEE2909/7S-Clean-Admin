@@ -9,7 +9,7 @@ const USERS = [
   { u: "user", p: "1234", role: "staff", name: "ผู้ใช้" },
 ];
 
-const AREAS = [
+const BASE_AREAS = [
   "ห้องครัวใน",
   "ห้องครัวนอก (บริเวณล้างจาน)",
   "ห้องครัวนอก (บริเวณทานข้าว)",
@@ -39,6 +39,9 @@ const todayKey = () => {
 const todayThai = () =>
   new Date().toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
 
+const timeThai = () =>
+  new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
+
 const BLUE = "bg-[#1B6A93]";
 
 function Header({ title, sub, children, logo }) {
@@ -66,7 +69,12 @@ export default function App() {
   const [results, setResults] = useState({}); // date -> areaIndex -> {checks, inspector}
   const [view, setView] = useState({ name: "list" });
   const [login, setLogin] = useState({ u: "user", name: "", p: "", err: "" });
-  const [assigning, setAssigning] = useState(null);
+  const [inspect, setInspect] = useState({}); // areaIndex -> ชื่อผู้ตรวจ
+  const [custom, setCustom] = useState([]); // [{name, type}] ห้องที่แอดมินเพิ่ม
+  const [adding, setAdding] = useState(false);
+  const [newRoom, setNewRoom] = useState({ name: "", type: "พื้นที่ส่วนรวม" });
+  const [clock, setClock] = useState("");
+  const [assigning, setAssigning] = useState(null); // {i, kind}
   const [nameInput, setNameInput] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [draft, setDraft] = useState({ checks: {}, inspector: "" });
@@ -75,6 +83,8 @@ export default function App() {
     try {
       const d = JSON.parse(localStorage.getItem(KEY) || "{}");
       if (d.assign) setAssign(d.assign);
+      if (d.inspect) setInspect(d.inspect);
+      if (Array.isArray(d.custom)) setCustom(d.custom);
       if (d.results) setResults(d.results);
       if (d.user) setUser(d.user);
     } catch (e) {}
@@ -84,9 +94,17 @@ export default function App() {
   useEffect(() => {
     if (!ready) return;
     try {
-      localStorage.setItem(KEY, JSON.stringify({ assign, results, user }));
+      localStorage.setItem(KEY, JSON.stringify({ assign, inspect, custom, results, user }));
     } catch (e) {}
-  }, [assign, results, user, ready]);
+  }, [assign, inspect, custom, results, user, ready]);
+
+  useEffect(() => {
+    setClock(timeThai());
+    const t = setInterval(() => setClock(timeThai()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const AREAS = [...BASE_AREAS, ...custom.map((c) => c.name)];
 
   if (!ready) return <main className="min-h-screen bg-[#EEF3F8]" />;
 
@@ -274,96 +292,205 @@ export default function App() {
   }
 
   // ---------- หน้ารายการพื้นที่ ----------
+  const typeOf = (i) => (i < BASE_AREAS.length ? "พื้นที่ส่วนรวม" : custom[i - BASE_AREAS.length].type);
+  const commonIdx = AREAS.map((_, i) => i).filter((i) => typeOf(i) === "พื้นที่ส่วนรวม");
+  const personalIdx = AREAS.map((_, i) => i).filter((i) => typeOf(i) === "พื้นที่ส่วนตัว");
+
+  const Card = ({ i }) => {
+    const r = results[day]?.[i];
+    const p = r ? Object.values(r.checks).filter((v) => v === "pass").length : 0;
+    const isCustom = i >= BASE_AREAS.length;
+    const label = "text-sm text-[#3B5268]";
+    const assignBtn = (kind) => (
+      <button
+        onClick={() => {
+          setAssigning({ i, kind });
+          setNameInput((kind === "worker" ? assign[i] : inspect[i]) || "");
+        }}
+        className="mt-1 h-11 w-full truncate rounded-xl bg-[#F1F4F8] px-3 text-sm font-bold text-[#1B6A93]"
+      >
+        {(kind === "worker" ? assign[i] : inspect[i]) || "มอบหมาย"}
+      </button>
+    );
+    return (
+      <li className="rounded-2xl border border-[#DBE8F5] bg-white p-4 shadow-sm">
+        <p className="flex items-center gap-2 font-bold text-[#1B6A93]">
+          <span className="inline-block h-7 min-w-7 rounded-full bg-[#E4EFFA] px-2 text-center text-sm leading-7">{i + 1}</span>
+          {AREAS[i]}
+        </p>
+        {isCustom && (
+          <p className="mt-1 text-sm text-[#3B5268]">
+            {typeOf(i)} · {assign[i] ? `ผู้รับผิดชอบ: ${assign[i]}` : "ยังไม่ได้มอบหมาย"}
+          </p>
+        )}
+        {isAdmin ? (
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            <div>
+              <span className={label}>มอบหมายงาน</span>
+              {assignBtn("worker")}
+            </div>
+            <div>
+              <span className={label}>มอบหมายงานผู้ตรวจ</span>
+              {assignBtn("inspector")}
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-[#3B5268]">
+              ผู้รับผิดชอบ: {assign[i] || "ยังไม่ได้มอบหมาย"} · ผู้ตรวจ: {inspect[i] || "ยังไม่ได้มอบหมาย"}
+              {r ? ` · ตรวจแล้ววันนี้ ผ่าน ${p}/${ITEMS.length}` : ""}
+            </p>
+            <button
+              onClick={() => {
+                setDraft(r ? { checks: r.checks, inspector: r.inspector } : { checks: {}, inspector: inspect[i] || user.name });
+                setView({ name: "check", index: i });
+              }}
+              className={`mt-3 h-11 rounded-xl ${BLUE} px-5 text-sm font-bold text-white`}
+            >
+              {r ? "ดู/แก้ผลตรวจ" : "ประเมิน"}
+            </button>
+          </>
+        )}
+      </li>
+    );
+  };
+
+  const doAddRoom = () => {
+    const name = newRoom.name.trim();
+    if (!name) return;
+    setCustom((c) => [...c, { name, type: newRoom.type }]);
+    setNewRoom({ name: "", type: "พื้นที่ส่วนรวม" });
+    setAdding(false);
+  };
+
+  const closeAssign = () => setAssigning(null);
+  const saveAssign = () => {
+    const v = nameInput.trim();
+    if (assigning.kind === "worker") setAssign((a) => ({ ...a, [assigning.i]: v }));
+    else setInspect((a) => ({ ...a, [assigning.i]: v }));
+    setAssigning(null);
+  };
+
   return (
     <main className="mx-auto min-h-screen max-w-md bg-[#EEF3F8] pb-10 text-[#12263A]">
       <Header title={"แบบประเมินความสะอาด 7ส."}>
-        <button onClick={() => setUser(null)} className="absolute right-0 top-0 rounded-full bg-white/20 px-3 py-1 text-sm">
+        <button
+          onClick={() => setUser(null)}
+          className="absolute right-0 top-1/2 -translate-y-1/2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#1B6A93]"
+        >
           ออกจากระบบ
         </button>
       </Header>
       <div className="relative -mt-10 px-5">
-        <div className="space-y-1 rounded-3xl bg-white p-4 text-sm shadow-lg">
+        <div className="mx-3 space-y-1 rounded-3xl bg-white p-4 text-sm shadow-lg">
           <p>
-            <span className="text-[#3B5268]">วันที่: </span>
+            <span className="text-[#3B5268]">วันที่ : </span>
             <span className="font-bold">{todayThai()}</span>
           </p>
           <p>
-            <span className="text-[#3B5268]">ผู้ใช้: </span>
-            <span className="font-bold">
-              {user.name} ({isAdmin ? "แอดมิน" : "ผู้ตรวจ"})
-            </span>
+            <span className="text-[#3B5268]">เวลา : </span>
+            <span className="font-bold">{clock}</span>
           </p>
         </div>
 
-        <h2 className="mb-3 mt-6 text-2xl font-bold text-[#1B6A93]">พื้นที่ส่วนรวม</h2>
+        <div className="mb-3 mt-6 flex items-end justify-between gap-3">
+          <h2 className="text-2xl font-bold text-[#1B6A93]">พื้นที่ส่วนรวม</h2>
+          {isAdmin && (
+            <button onClick={() => setAdding(true)} className={`rounded-xl ${BLUE} px-4 py-3 text-sm font-bold text-white`}>
+              + เพิ่มห้องอื่น ๆ
+            </button>
+          )}
+        </div>
         <ul className="space-y-3">
-          {AREAS.map((name, i) => {
-            const r = results[day]?.[i];
-            const p = r ? Object.values(r.checks).filter((v) => v === "pass").length : 0;
-            return (
-              <li key={name} className="rounded-2xl bg-white p-4 shadow-sm">
-                <p className="font-bold text-[#1B6A93]">
-                  <span className="mr-2 inline-block h-6 w-6 rounded-full bg-[#E4EFFA] text-center text-sm leading-6">{i + 1}</span>
-                  {name}
-                </p>
-                <p className="mt-1 text-sm text-[#3B5268]">
-                  {assign[i] ? `ผู้รับผิดชอบ: ${assign[i]}` : "ยังไม่ได้มอบหมายงาน"}
-                  {r ? ` · ตรวจแล้ววันนี้ ผ่าน ${p}/${ITEMS.length}` : ""}
-                </p>
-                <div className="mt-3 flex gap-2">
-                  {isAdmin && (
-                    <button
-                      onClick={() => {
-                        setAssigning(i);
-                        setNameInput(assign[i] || "");
-                      }}
-                      className="h-11 rounded-xl bg-[#F1F4F8] px-5 text-sm font-medium"
-                    >
-                      มอบหมาย
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setDraft(r ? { checks: r.checks, inspector: r.inspector } : { checks: {}, inspector: user.name });
-                      setView({ name: "check", index: i });
-                    }}
-                    className={`h-11 rounded-xl ${BLUE} px-5 text-sm font-medium text-white`}
-                  >
-                    {r ? "ดู/แก้ผลตรวจ" : "ประเมิน"}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
+          {commonIdx.map((i) => (
+            <Card key={i} i={i} />
+          ))}
         </ul>
+
+        <h2 className="mb-3 mt-8 text-2xl font-bold text-[#1B6A93]">พื้นที่ส่วนตัว</h2>
+        {personalIdx.length === 0 ? (
+          <p className="text-sm text-[#3B5268]">ยังไม่มีพื้นที่ส่วนตัว</p>
+        ) : (
+          <ul className="space-y-3">
+            {personalIdx.map((i) => (
+              <Card key={i} i={i} />
+            ))}
+          </ul>
+        )}
         <p className="mt-6 text-xs text-[#3B5268]">ข้อมูลเก็บในเครื่องนี้เท่านั้น (รอบสองจะซิงค์ข้ามเครื่อง)</p>
       </div>
 
-      {assigning !== null && (
-        <div className="fixed inset-0 z-10 flex items-end bg-black/40" onClick={() => setAssigning(null)}>
+      {assigning && (
+        <div className="fixed inset-0 z-10 flex items-end bg-black/40" onClick={closeAssign}>
           <div className="mx-auto w-full max-w-md rounded-t-3xl bg-white p-5" onClick={(e) => e.stopPropagation()}>
-            <p className="font-bold text-[#1B6A93]">มอบหมาย: {AREAS[assigning]}</p>
+            <p className="font-bold text-[#1B6A93]">
+              {assigning.kind === "worker" ? "มอบหมายงาน" : "มอบหมายงานผู้ตรวจ"}: {AREAS[assigning.i]}
+            </p>
             <input
               autoFocus
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
-              placeholder="ชื่อผู้รับผิดชอบ"
+              placeholder={assigning.kind === "worker" ? "ชื่อผู้รับผิดชอบ" : "ชื่อผู้ตรวจ"}
               className="mt-3 h-[52px] w-full rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] px-4 text-base"
             />
             <div className="mt-4 flex gap-2">
-              <button onClick={() => setAssigning(null)} className="h-12 flex-1 rounded-xl bg-[#F1F4F8] font-medium">
+              <button onClick={closeAssign} className="h-12 flex-1 rounded-xl bg-[#F1F4F8] font-medium">
                 ยกเลิก
               </button>
-              <button
-                onClick={() => {
-                  setAssign((a) => ({ ...a, [assigning]: nameInput.trim() }));
-                  setAssigning(null);
-                }}
-                className={`h-12 flex-1 rounded-xl ${BLUE} font-bold text-white`}
-              >
+              <button onClick={saveAssign} className={`h-12 flex-1 rounded-xl ${BLUE} font-bold text-white`}>
                 บันทึก
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {adding && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-5" onClick={() => setAdding(false)}>
+          <div className="w-full max-w-md rounded-3xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-2xl font-bold text-[#1B6A93]">เพิ่มห้องอื่น ๆ</h3>
+              <button onClick={() => setAdding(false)} className="rounded-xl border-2 border-[#1B6A93] px-5 py-2 text-sm font-bold text-[#1B6A93]">
+                ปิด
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-[#667C91]">เพิ่มพื้นที่สำหรับมอบหมายงานทำความสะอาด</p>
+
+            <label className="mt-5 block">
+              <span className="font-bold text-[#3F4655]">ชื่อห้อง</span>
+              <input
+                autoFocus
+                value={newRoom.name}
+                onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
+                placeholder="เช่น ห้องอเนกประสงค์"
+                className="mt-2 h-[52px] w-full rounded-2xl border-2 border-[#79BBE4] bg-[#F4F8FC] px-4 text-base"
+              />
+            </label>
+            <label className="mt-4 block">
+              <span className="font-bold text-[#3F4655]">ประเภทพื้นที่</span>
+              <select
+                value={newRoom.type}
+                onChange={(e) => setNewRoom({ ...newRoom, type: e.target.value })}
+                className="mt-2 h-[52px] w-full rounded-2xl border-2 border-[#79BBE4] bg-[#F4F8FC] px-4 text-base"
+              >
+                <option>พื้นที่ส่วนรวม</option>
+                <option>พื้นที่ส่วนตัว</option>
+              </select>
+            </label>
+
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => setAdding(false)} className="h-12 flex-1 rounded-xl border-2 border-[#1B6A93] font-bold text-[#1B6A93]">
+                ยกเลิก
+              </button>
+              <button
+                onClick={doAddRoom}
+                disabled={!newRoom.name.trim()}
+                className={`h-12 flex-[1.3] rounded-xl ${BLUE} font-bold text-white disabled:opacity-40`}
+              >
+                เพิ่มห้อง
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-[#667C91]">ห้องใหม่จะแสดงต่อท้ายรายการพื้นที่ส่วนรวม</p>
           </div>
         </div>
       )}
