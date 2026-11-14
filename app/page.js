@@ -93,7 +93,7 @@ export default function App() {
   const doLogin = () => {
     const found = USERS.find((x) => x.u === login.u.trim() && x.p === login.p);
     if (!found) return setLogin({ ...login, err: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
-    setUser({ u: found.u, role: found.role, name: found.role === "admin" ? found.name : login.name.trim() || "User" });
+    setUser({ u: found.u, role: found.role, name: login.name.trim() || (found.role === "admin" ? found.name : "User") });
     setLogin({ u: "user", name: "", p: "", err: "" });
   };
 
@@ -101,32 +101,40 @@ export default function App() {
   if (!user) {
     return (
       <main className="mx-auto min-h-screen max-w-md bg-[#EEF3F8] text-[#12263A]">
-        <Header sub="CLEAN CHECK" title="เข้าสู่ระบบ" logo>
+        <Header sub="CLEAN CHECK" title="เข้าสู่ระบบ">
           <p className="mt-2 text-[#E4EFFA]">ประเมินความสะอาดตามหลัก 7ส</p>
         </Header>
         <div className="relative -mt-10 px-5">
           <div className="space-y-5 rounded-3xl bg-white p-6 shadow-lg">
             <div>
               <span className="text-sm font-medium text-[#3B5268]">ชื่อผู้ใช้</span>
-              <div className="mt-2 flex h-[52px] w-full items-center rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] pl-4 pr-2 text-base focus-within:border-[#1B6A93] focus-within:bg-white">
-                {login.u === "admin" ? (
-                  <span className="flex-1 font-medium">Admin</span>
-                ) : (
-                  <input
-                    value={login.name}
-                    onChange={(e) => setLogin({ ...login, name: e.target.value, err: "" })}
-                    placeholder="User"
-                    aria-label="ชื่อผู้ใช้"
-                    className="min-w-0 flex-1 bg-transparent font-medium outline-none placeholder:text-[#12263A]"
-                  />
-                )}
+              <div className="mt-2 flex h-[52px] w-full items-center gap-2 rounded-2xl border-2 border-[#C9D7E5] bg-[#F4F8FC] pl-2 pr-3 text-base focus-within:border-[#1B6A93] focus-within:bg-white">
                 <button
                   type="button"
                   onClick={() => setLogin({ ...login, u: login.u === "admin" ? "user" : "admin", err: "" })}
-                  className="shrink-0 rounded-lg px-2 py-2 text-[13px] text-[#3B5268]"
+                  aria-label="สลับระหว่าง User และ Admin"
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 font-medium text-[#12263A] shadow-sm active:scale-95"
                 >
-                  {login.u === "admin" ? "แตะเพื่อเปลี่ยนเป็น User" : "แตะเพื่อเปลี่ยนเป็น Admin"}
+                  <span>{login.u === "admin" ? "Admin" : "User"}</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B6A93" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M7 4 3 8l4 4" />
+                    <path d="M3 8h14" />
+                    <path d="m17 20 4-4-4-4" />
+                    <path d="M21 16H7" />
+                  </svg>
                 </button>
+                <input
+                  value={login.name}
+                  onChange={(e) => setLogin({ ...login, name: e.target.value, err: "" })}
+                  placeholder="พิมพ์ชื่อผู้ใช้"
+                  aria-label="ชื่อผู้ใช้"
+                  autoCapitalize="none"
+                  className="min-w-0 flex-1 bg-transparent font-medium outline-none"
+                />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B5268" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 21a8 8 0 0 1 16 0" />
+                </svg>
               </div>
             </div>
             <label className="block">
@@ -155,7 +163,7 @@ export default function App() {
             </button>
             <p className="text-center text-sm text-[#3B5268]">ลืมรหัสผ่าน ติดต่อผู้ดูแลระบบ</p>
           </div>
-          <p className="mt-6 text-center text-xs text-[#3B5268]">รหัสผ่านทดลอง: 1234 · พิมพ์ชื่อของคุณแทนคำว่า User ได้ เช่น Vee</p>
+          <p className="mt-6 text-center text-xs text-[#3B5268]">รหัสผ่านทดลอง: 1234 · แตะ User/Admin เพื่อสลับ และพิมพ์ชื่อของคุณได้ เช่น Vee</p>
           <p className="mt-10 pb-6 text-center text-xs text-[#3B5268]">ระบบประเมินความสะอาด 7ส</p>
         </div>
       </main>
