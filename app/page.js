@@ -242,6 +242,7 @@ export default function App() {
   const [myTab, setMyTab] = useState("tasks");
   const [doneTab, setDoneTab] = useState("todo");
   const [inspect, setInspect] = useState({}); // areaIndex -> ชื่อผู้ตรวจ
+  const [removed, setRemoved] = useState({}); // areaIndex -> true (ห้องที่แอดมินลบแล้ว)
   const [custom, setCustom] = useState([]); // [{name, type}] ห้องที่แอดมินเพิ่ม
   const [adding, setAdding] = useState(false);
   const [newRoom, setNewRoom] = useState({ name: "", type: "พื้นที่ส่วนรวม" });
@@ -257,6 +258,7 @@ export default function App() {
       if (d.assign) setAssign(d.assign);
       if (d.inspect) setInspect(d.inspect);
       if (d.due) setDue(d.due);
+      if (d.removed) setRemoved(d.removed);
       if (Array.isArray(d.custom)) setCustom(d.custom);
       if (d.results) setResults(d.results);
       if (d.user) setUser(d.user);
@@ -271,9 +273,9 @@ export default function App() {
   useEffect(() => {
     if (!ready) return;
     try {
-      localStorage.setItem(KEY, JSON.stringify({ assign, inspect, custom, results, due, user }));
+      localStorage.setItem(KEY, JSON.stringify({ assign, inspect, custom, results, due, removed, user }));
     } catch (e) {}
-  }, [assign, inspect, custom, results, due, user, ready]);
+  }, [assign, inspect, custom, results, due, removed, user, ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -489,15 +491,15 @@ export default function App() {
 
   // ---------- หน้ารายการพื้นที่ ----------
   const typeOf = (i) => (i < BASE_AREAS.length ? "พื้นที่ส่วนรวม" : custom[i - BASE_AREAS.length].type);
-  const commonIdx = AREAS.map((_, i) => i).filter((i) => typeOf(i) === "พื้นที่ส่วนรวม");
-  const personalIdx = AREAS.map((_, i) => i).filter((i) => typeOf(i) === "พื้นที่ส่วนตัว");
+  const commonIdx = AREAS.map((_, i) => i).filter((i) => !removed[i] && typeOf(i) === "พื้นที่ส่วนรวม");
+  const personalIdx = AREAS.map((_, i) => i).filter((i) => !removed[i] && typeOf(i) === "พื้นที่ส่วนตัว");
 
 
   // ---------- ฝั่งผู้ใช้ (งานของฉัน) ----------
   if (!isAdmin) {
     const me = (user.name || "").trim().toLowerCase();
     const mine = (n) => !!n && n.trim().toLowerCase() === me;
-    const idx = AREAS.map((_, k) => k);
+    const idx = AREAS.map((_, k) => k).filter((k) => !removed[k]);
     const myTasks = idx.filter((k) => mine(assign[k]));
     const myChecks = idx.filter((k) => mine(inspect[k]));
     const subsToday = subs[day] || {};
@@ -864,7 +866,7 @@ export default function App() {
     );
   }
 
-  const Card = ({ i }) => {
+  const Card = ({ i, n }) => {
     const r = results[day]?.[i];
     const p = r ? Object.values(r.checks).filter((v) => v === "pass").length : 0;
     const isCustom = i >= BASE_AREAS.length;
@@ -883,10 +885,23 @@ export default function App() {
     );
     return (
       <li className="rounded-2xl border border-[#DBE8F5] bg-white p-4 shadow-sm">
-        <p className="flex items-center gap-2 font-bold text-[#1B6A93]">
-          <span className="inline-block h-7 min-w-7 rounded-full bg-[#E4EFFA] px-2 text-center text-sm leading-7">{i + 1}</span>
-          {AREAS[i]}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="flex items-center gap-2 font-bold text-[#1B6A93]">
+            <span className="inline-block h-7 min-w-7 rounded-full bg-[#E4EFFA] px-2 text-center text-sm leading-7">{n}</span>
+            {AREAS[i]}
+          </p>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (confirm(`ลบห้อง "${AREAS[i]}" ออกจากรายการ?`)) setRemoved((r) => ({ ...r, [i]: true }));
+              }}
+              aria-label={`ลบห้อง ${AREAS[i]}`}
+              className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              ลบ
+            </button>
+          )}
+        </div>
         {isCustom && (
           <p className="mt-1 text-sm text-[#3B5268]">
             {typeOf(i)} · {assign[i] ? `ผู้รับผิดชอบ: ${assign[i]}` : "ยังไม่ได้มอบหมาย"}
@@ -986,8 +1001,8 @@ export default function App() {
           )}
         </div>
         <ul className="space-y-3">
-          {commonIdx.map((i) => (
-            <Card key={i} i={i} />
+          {commonIdx.map((i, n) => (
+            <Card key={i} i={i} n={n + 1} />
           ))}
         </ul>
 
@@ -996,8 +1011,8 @@ export default function App() {
           <p className="text-sm text-[#3B5268]">ยังไม่มีพื้นที่ส่วนตัว</p>
         ) : (
           <ul className="space-y-3">
-            {personalIdx.map((i) => (
-              <Card key={i} i={i} />
+            {personalIdx.map((i, n) => (
+              <Card key={i} i={i} n={n + 1} />
             ))}
           </ul>
         )}
