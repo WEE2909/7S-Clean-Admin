@@ -4,6 +4,36 @@ import { useEffect, useRef, useState } from "react";
 const KEY = "cleancheck-v1";
 const SUBS_KEY = "cleancheck-subs-v1";
 
+// ---------- ซิงค์ข้ามเครื่อง (Supabase) : ทำงานเมื่อมีการตั้งค่า 2 ตัวแปรใน Vercel ----------
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const SYNC = !!(SB_URL && SB_KEY);
+// คีย์แบบใหม่ (sb_publishable_...) ไม่ใช่ JWT จึงส่งแค่ apikey ส่วนคีย์แบบเก่า (eyJ...) ส่ง Authorization ด้วย
+const sbHeaders = () => ({
+  apikey: SB_KEY,
+  ...(String(SB_KEY).startsWith("eyJ") ? { Authorization: `Bearer ${SB_KEY}` } : {}),
+  "Content-Type": "application/json",
+});
+async function sbGet(query) {
+  const r = await fetch(`${SB_URL}/rest/v1/kv?${query}`, { headers: sbHeaders(), cache: "no-store" });
+  if (!r.ok) throw new Error("get " + r.status);
+  return r.json();
+}
+async function sbPush(rows) {
+  const r = await fetch(`${SB_URL}/rest/v1/kv?on_conflict=key`, {
+    method: "POST",
+    headers: { ...sbHeaders(), Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify(rows),
+  });
+  if (!r.ok) throw new Error("push " + r.status);
+}
+const stable = (v) =>
+  JSON.stringify(v, (k, val) =>
+    val && typeof val === "object" && !Array.isArray(val)
+      ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : val
+  );
+
 // บัญชีทดลอง (รอบแรก) จะเปลี่ยนเป็นระบบล็อกอินจริงในรอบสอง
 const USERS = [
   { u: "admin", p: "1234", role: "admin", name: "ผู้ดูแลระบบ" },
@@ -283,6 +313,135 @@ export default function App() {
       localStorage.setItem(SUBS_KEY, JSON.stringify(subs));
     } catch (e) {}
   }, [subs, ready]);
+
+  // ---- ซิงค์ข้ามเครื่อง ----
+  const syncedCfg = useRef(null);
+  const syncedRes = useRef(null);
+  const pushedSubs = useRef(new Set());
+  const cfgRef = useRef("");
+  const resRef = useRef("");
+  const subsRef = useRef({});
+  const [pulled, setPulled] = useState(false);
+  const [syncErr, setSyncErr] = useState(false);
+  const cfgNow = stable({ assign, inspect, custom, due, removed });
+  const resNow = stable(results);
+  cfgRef.current = cfgNow;
+  resRef.current = resNow;
+  subsRef.current = subs;
+
+  useEffect(() => {
+    if (!SYNC || !ready) return;
+    let stop = false;
+    const pull = async () => {
+      try {
+        const rows = await sbGet("select=key,value&key=not.like.sub:*");
+        if (stop) return;
+        const m = {};
+        rows.forEach((r) => (m[r.key] = r.value));
+        if (m.config) {
+          const c = stable(m.config);
+          const first = syncedCfg.current === null;
+          const clean = cfgRef.current === syncedCfg.current;
+          if (c !== syncedCfg.current && (first || clean)) {
+            const v = m.config;
+            setAssign(v.assign || {});
+            setInspect(v.inspect || {});
+            setCustom(v.custom || []);
+            setDue(v.due || {});
+            setRemoved(v.removed || {});
+            syncedCfg.current = c;
+          }
+        }
+        if (m.results) {
+          const c = stable(m.results);
+          const first = syncedRes.current === null;
+          const clean = resRef.current === syncedRes.current;
+          if (c !== syncedRes.current && (first || clean)) {
+            setResults(m.results || {});
+            syncedRes.current = c;
+          }
+        }
+        // งานที่ส่งแล้ว (มีรูป) ดึงเฉพาะอันที่เครื่องนี้ยังไม่มี
+        const keys = await sbGet("select=key&key=like.sub:*");
+        const missing = keys
+          .map((r) => r.key)
+          .filter((k) => {
+            const [, d, i] = k.split(":");
+            return !subsRef.current[d]?.[i];
+          })
+          .slice(0, 8);
+        if (missing.length) {
+          const got = await Promise.all(missing.map((k) => sbGet(`select=key,value&key=eq.${encodeURIComponent(k)}`)));
+          const list = got.flat().map((r) => r.value).filter(Boolean);
+          if (!stop && list.length) {
+            setSubs((prev) => {
+              let next = prev;
+              list.forEach((rv) => {
+                pushedSubs.current.add(`${rv.day}:${rv.i}:${rv.s.at}`);
+                if (next === prev) next = { ...prev };
+                next[rv.day] = { ...(next[rv.day] || {}), [rv.i]: rv.s };
+              });
+              return next;
+            });
+          }
+        }
+        setSyncErr(false);
+        setPulled(true);
+      } catch (e) {
+        if (!stop) setSyncErr(true);
+      }
+    };
+    pull();
+    const t = setInterval(pull, 4000);
+    const vis = () => {
+      if (document.visibilityState === "visible") pull();
+    };
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      stop = true;
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", vis);
+    };
+  }, [ready]);
+
+  useEffect(() => {
+    if (!SYNC || !pulled || cfgNow === syncedCfg.current) return;
+    const t = setTimeout(() => {
+      sbPush([{ key: "config", value: JSON.parse(cfgNow) }])
+        .then(() => {
+          syncedCfg.current = cfgNow;
+        })
+        .catch(() => setSyncErr(true));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [cfgNow, pulled]);
+
+  useEffect(() => {
+    if (!SYNC || !pulled || resNow === syncedRes.current) return;
+    const t = setTimeout(() => {
+      sbPush([{ key: "results", value: JSON.parse(resNow) }])
+        .then(() => {
+          syncedRes.current = resNow;
+        })
+        .catch(() => setSyncErr(true));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [resNow, pulled]);
+
+  useEffect(() => {
+    if (!SYNC || !pulled) return;
+    const rows = [];
+    Object.entries(subs).forEach(([d, m]) =>
+      Object.entries(m).forEach(([i, sb]) => {
+        const id = `${d}:${i}:${sb.at}`;
+        if (!pushedSubs.current.has(id)) rows.push({ id, row: { key: `sub:${d}:${i}`, value: { day: d, i: Number(i), s: sb } } });
+      })
+    );
+    if (!rows.length) return;
+    sbPush(rows.map((r) => r.row))
+      .then(() => rows.forEach((r) => pushedSubs.current.add(r.id)))
+      .catch(() => setSyncErr(true));
+  }, [subs, pulled]);
 
   useEffect(() => {
     setClock(timeThai());
@@ -1016,7 +1175,7 @@ export default function App() {
             ))}
           </ul>
         )}
-        <p className="mt-6 text-xs text-[#3B5268]">ข้อมูลเก็บในเครื่องนี้เท่านั้น (รอบสองจะซิงค์ข้ามเครื่อง)</p>
+        <p className="mt-6 text-xs text-[#3B5268]">{SYNC ? (syncErr ? "ซิงค์ไม่สำเร็จ กำลังลองใหม่..." : pulled ? "ซิงค์ข้ามเครื่องแล้ว" : "กำลังเชื่อมต่อ...") : "ข้อมูลเก็บในเครื่องนี้เท่านั้น"}</p>
       </div>
 
       {assigning && (
