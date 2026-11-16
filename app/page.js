@@ -38,7 +38,6 @@ const stable = (v) =>
 const USERS = [
   { u: "admin", p: "1234", role: "admin", name: "ผู้ดูแลระบบ" },
   { u: "user", p: "1234", role: "staff", name: "ผู้ใช้" },
-  { u: "Boss", p: "Boss1234", role: "staff", name: "Boss" },
 ];
 
 const BASE_AREAS = [
