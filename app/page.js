@@ -105,6 +105,53 @@ function CamIcon({ size = 24 }) {
   );
 }
 
+function LogoutIcon({ size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" />
+      <path d="M16 8l4 4-4 4" />
+      <path d="M20 12H9" />
+    </svg>
+  );
+}
+
+function LogoutButton({ onLogout }) {
+  const [ask, setAsk] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setAsk(true)}
+        aria-label="ออกจากระบบ"
+        className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B6A93] shadow-sm active:scale-95"
+      >
+        <LogoutIcon />
+      </button>
+      {ask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={() => setAsk(false)}>
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-[#12263A]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-[#1B6A93]">ออกจากระบบ</h3>
+            <p className="mt-2 text-[#3B5268]">ต้องการออกจากระบบใช่ไหม</p>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => setAsk(false)} className="h-12 flex-1 rounded-xl border-2 border-[#1B6A93] font-bold text-[#1B6A93]">
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => {
+                  setAsk(false);
+                  onLogout();
+                }}
+                className="h-12 flex-1 rounded-xl bg-[#1B6A93] font-bold text-white"
+              >
+                ออกจากระบบ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function StaffHeader({ onLogout, onBack, title, sub, date, pb = "pb-16", children }) {
   return (
     <header className={`relative overflow-hidden rounded-b-[36px] ${BLUE} px-5 pt-8 text-white ${pb}`}>
@@ -112,9 +159,7 @@ function StaffHeader({ onLogout, onBack, title, sub, date, pb = "pb-16", childre
       <div className="absolute right-8 top-20 h-20 w-20 rounded-full bg-white/15" />
       <div className="relative">
         <div className="flex justify-end">
-          <button onClick={onLogout} className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#1B6A93]">
-            ออกจากระบบ
-          </button>
+          <LogoutButton onLogout={onLogout} />
         </div>
         <div className="mt-4 flex items-center gap-3">
           {onBack && (
@@ -240,7 +285,7 @@ function PhotoBox({ src, label, tone, className = "" }) {
 }
 
 
-function Header({ title, sub, children, logo }) {
+function Header({ title, sub, children, logo, onLogout }) {
   return (
     <header className={`relative overflow-hidden rounded-b-[36px] ${BLUE} px-5 pb-24 pt-8 text-white`}>
       <div className="absolute -right-14 -top-14 h-48 w-48 rounded-full bg-white/10" />
@@ -249,7 +294,12 @@ function Header({ title, sub, children, logo }) {
       ) : (
         <div className="absolute right-8 top-10 h-20 w-20 rounded-full bg-white/15" />
       )}
-      <div className="relative">
+      <div className={`relative ${onLogout ? "pr-14" : ""}`}>
+        {onLogout && (
+          <div className="absolute right-0 top-0">
+            <LogoutButton onLogout={onLogout} />
+          </div>
+        )}
         {sub && <p className="text-sm font-medium tracking-wide">{sub}</p>}
         <h1 className="mt-1 text-2xl font-bold leading-snug">{title}</h1>
         {children}
@@ -277,6 +327,7 @@ export default function App() {
   const [adding, setAdding] = useState(false);
   const [newRoom, setNewRoom] = useState({ name: "", type: "พื้นที่ส่วนรวม" });
   const [clock, setClock] = useState("");
+  const [, setTick] = useState(0); // ให้หน้าจอรีเฟรชเอง เพื่อนับเวลา 5 นาที
   const [assigning, setAssigning] = useState(null); // {i, kind}
   const [nameInput, setNameInput] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -445,7 +496,10 @@ export default function App() {
 
   useEffect(() => {
     setClock(timeThai());
-    const t = setInterval(() => setClock(timeThai()), 30000);
+    const t = setInterval(() => {
+      setClock(timeThai());
+      setTick((x) => x + 1);
+    }, 15000);
     return () => clearInterval(t);
   }, []);
 
@@ -544,13 +598,13 @@ export default function App() {
     const save = () => {
       setResults((r) => ({
         ...r,
-        [day]: { ...(r[day] || {}), [i]: { checks: draft.checks, inspector: draft.inspector } },
+        [day]: { ...(r[day] || {}), [i]: { checks: draft.checks, inspector: draft.inspector, at: Date.now() } },
       }));
       setView({ name: "list" });
     };
     return (
       <main className="mx-auto min-h-screen max-w-md bg-[#EEF3F8] pb-28 text-[#12263A]">
-        <Header sub="CLEAN CHECK" title={AREAS[i]} />
+        <Header sub="CLEAN CHECK" title={AREAS[i]} onLogout={() => setUser(null)} />
         <div className="relative -mt-10 space-y-4 px-5">
           <div className="space-y-2 rounded-3xl bg-white p-4 text-sm shadow-lg">
             <div className="flex justify-between">
@@ -1066,18 +1120,31 @@ export default function App() {
             {typeOf(i)} · {assign[i] ? `ผู้รับผิดชอบ: ${assign[i]}` : "ยังไม่ได้มอบหมาย"}
           </p>
         )}
-        {(subs[day] || {})[i] && (
-          <button
-            onClick={() => {
-              const r = results[day]?.[i];
-              setDraft(r ? { checks: r.checks, inspector: r.inspector } : { checks: {}, inspector: inspect[i] || user.name });
-              setView({ name: "check", index: i });
-            }}
-            className="mt-2 w-full rounded-xl bg-[#E4F3EA] px-3 py-2 text-left text-sm font-medium text-[#1F6B43]"
-          >
-            ส่งงานแล้ว {fmtTime(subs[day][i].at)} โดย {subs[day][i].by} · แตะเพื่อดูรูปและตรวจ
-          </button>
-        )}
+        {(() => {
+          const sb = (subs[day] || {})[i];
+          if (!sb) return null;
+          const rr = results[day]?.[i];
+          const allPass = !!rr && ITEMS.every((it) => rr.checks?.[it.id] === "pass");
+          // ตรวจผ่านทั้งหมดแล้ว: แสดงสีเขียวอีก 5 นาที จากนั้นการ์ดกลับเป็นสีขาวปกติ
+          if (allPass && Date.now() - (rr.at || 0) > 5 * 60 * 1000) return null;
+          const tone = !rr ? "bg-[#E4F3EA] text-[#1F6B43]" : allPass ? "bg-[#2E8B57] text-white" : "bg-[#FDEBD0] text-[#8A5A00]";
+          const text = !rr
+            ? `ส่งงานแล้ว ${fmtTime(sb.at)} โดย ${sb.by} · แตะเพื่อดูรูปและตรวจ`
+            : allPass
+            ? "ตรวจผ่านทั้งหมดแล้ว · จะกลับเป็นปกติใน 5 นาที"
+            : "ตรวจแล้ว มีรายการต้องปรับปรุง · แตะเพื่อดู";
+          return (
+            <button
+              onClick={() => {
+                setDraft(rr ? { checks: rr.checks, inspector: rr.inspector } : { checks: {}, inspector: inspect[i] || user.name });
+                setView({ name: "check", index: i });
+              }}
+              className={`mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-medium ${tone}`}
+            >
+              {text}
+            </button>
+          );
+        })()}
         {isAdmin ? (
           <div className="mt-2 grid grid-cols-2 gap-3">
             <div>
@@ -1131,14 +1198,7 @@ export default function App() {
 
   return (
     <main className="mx-auto min-h-screen max-w-md bg-[#EEF3F8] pb-10 text-[#12263A]">
-      <Header title={"แบบประเมินความสะอาด 7ส."}>
-        <button
-          onClick={() => setUser(null)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#1B6A93]"
-        >
-          ออกจากระบบ
-        </button>
-      </Header>
+      <Header title={"แบบประเมินความสะอาด 7ส."} onLogout={() => setUser(null)} />
       <div className="relative -mt-10 px-5">
         <div className="mx-3 space-y-1 rounded-3xl bg-white p-4 text-sm shadow-lg">
           <p>
